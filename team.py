@@ -1,11 +1,10 @@
 class Team:
-    def __init__(self, pos_and_counts_needed: dict, policy: str):
+    def __init__(self, pos_and_counts_needed: dict):
         self.needed_pos_counts = pos_and_counts_needed.copy()
         self.current_roster_size = 0
         self.current_pos_counts = {pos: 0 for pos in pos_and_counts_needed.keys()}
         self.score = 0.0
         self.pos_draft_order = list()
-        self.policy = policy
 
     def add_player(self, pos: str, score: float) -> None:
         self.score += score

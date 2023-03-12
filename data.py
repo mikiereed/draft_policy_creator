@@ -5,7 +5,7 @@ from typing import Optional
 
 # crudely based on 2022 stat distribution
 POS_MEAN_AND_STD = {
-    "QB": {"MEAN": 280, "STD": 75},
+    "QB": {"MEAN": 280, "STD": 30},
     "RB": {"MEAN": 140, "STD": 60},
     "WR": {"MEAN": 130, "STD": 45},
     "TE": {"MEAN": 80, "STD": 35},

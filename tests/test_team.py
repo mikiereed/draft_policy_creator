@@ -9,7 +9,7 @@ _simple_pos_and_counts = {
 
 
 def test_team_init():
-    team = Team(pos_and_counts_needed=_simple_pos_and_counts, policy="no_idea")
+    team = Team(pos_and_counts_needed=_simple_pos_and_counts)
     assert team.needed_pos_counts == _simple_pos_and_counts
     assert team.current_pos_counts == {
         "qb": 0,
@@ -20,7 +20,7 @@ def test_team_init():
 
 
 def test_team_add():
-    team = Team(_simple_pos_and_counts, policy="no_idea")
+    team = Team(_simple_pos_and_counts)
     team.add_player("rb", 203)
 
     assert team.score == 203

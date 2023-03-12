@@ -6,15 +6,11 @@ from team import Team
 
 
 class Draft:
-    def __init__(self, team_count: int, needed_pos_and_counts: dict):
-        teams = list()
-        policy_weights = [2 if policy == "learned" else 1 for policy in Policy.policies]
-        team_policies = random.choices(Policy.policies, k=team_count, weights=policy_weights)
-        # team_policies = random.choices(Policy.policies, k=team_count)
-        for i in range(team_count):
-            teams.append(Team(needed_pos_and_counts, policy=team_policies[i]))
+    def __init__(self, needed_pos_and_counts: dict, policies: list):
+        teams = [Team(needed_pos_and_counts) for _ in range(len(policies))]
         self.teams = teams
-        self.team_count = team_count
+        self.policies = policies
+        self.team_count = len(policies)
         self.current_team_index = 0
         self.current_pick = 1
         self.rounds = sum(needed_pos_and_counts.values())
@@ -24,10 +20,14 @@ class Draft:
     def current_team_selecting(self):
         return self.teams[self.current_team_index]
 
-    def simulate(self, data: Data, policy: Policy) -> None:
+    def simulate(self, data: Data) -> None:
         while self.current_pick <= self.rounds * self.team_count:
             current_team = self.current_team_selecting
-            position_to_draft = policy.get_action(current_team, self.current_round, data)
+            position_to_draft = self.policies[self.current_team_index].get_action(
+                current_team,
+                self.current_round,
+                data
+            )
             score = data.get_and_remove_score(position_to_draft)
             self._next_team_selection(position_to_draft, score)
 
@@ -59,14 +59,14 @@ class Draft:
 
         return {team: {
             "score": score - mean_score,
-            "position_draft_order": self.teams[team].pos_draft_order
+            "position_draft_order": self.teams[team].pos_draft_order,
         } for team, score in sorted_scores}
 
     def __repr__(self):
         print_string = ""
         results = self.results()
         for team in results:
-            print_string += f"{self.teams[team].policy}\n"
+            print_string += f"{self.policies[team].policy}\n"
             print_string += f"{team}: {results[team]['score']} {results[team]['position_draft_order']}\n"
 
         return print_string
