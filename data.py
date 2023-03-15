@@ -15,7 +15,7 @@ POS_MEAN_AND_STD = {
 
 
 class Data:
-    def __init__(self, teams: int, pos_counts: dict, percent_extra: int = 0, random_seed: Optional[int] = None):
+    def __init__(self, team_count: int, pos_counts: dict, percent_extra: int = 0, random_seed: Optional[int] = None):
         if random_seed is not None:
             random.seed(random_seed)
         players = dict()
@@ -26,7 +26,7 @@ class Data:
                 a=pos_std,
                 loc=pos_mean/2,
                 scale=pos_std,
-                size=math.ceil(pos_counts[pos] * teams * (1 + (percent_extra / 100)))
+                size=math.ceil(pos_counts[pos] * team_count * (1 + (percent_extra / 100)))
             )
             players[pos] = sorted(scores, reverse=True)
 

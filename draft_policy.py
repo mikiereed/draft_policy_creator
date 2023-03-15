@@ -5,24 +5,35 @@ from typing import Optional
 
 from team import Team
 from data import Data
+from mcts import MCTS
 
 
 class Policy:
-    _policies = ["offline", "random", "highest_available", "epsilon_highest_available", "epsilon_learned"]
+    _policies = ["mcts", "offline", "random", "highest_available", "epsilon_highest_available", "epsilon_offline"]
 
-    def __init__(self, policy: str, epsilon: Optional[float] = 0.2, random_seed: Optional[int] = None):
+    def __init__(
+            self,
+            policy: str,
+            epsilon: Optional[float] = 0.2,
+            random_seed: Optional[int] = None,
+            offline_policy: Optional[dict] = None,
+    ):
         if random_seed is not None:
             random.seed(random_seed)
         assert policy in self._policies
         self.policy = policy
         self.epsilon = epsilon
         self.offline_policy = None
+        self.mcts = None
+        self.random_seed = random_seed
 
     def get_action(
             self,
             team: Team,
             current_round: Optional[int] = None,
             data: Optional[Data] = None,
+            teams: Optional[list[Team]] = None,
+            policies: Optional[list] = None,
     ):
         if self.policy == "offline":
             return self._offline_policy_action(team, current_round)
@@ -32,8 +43,19 @@ class Policy:
             return self._highest_available_action(team, data)
         if self.policy == "epsilon_highest_available":
             return self._epsilon_highest_available_action(team, data)
-        if self.policy == "epsilon_learned":
-            return self._epsilon_learned_policy_action(team, current_round)
+        if self.policy == "epsilon_offline":
+            return self._epsilon_offline_policy_action(team, current_round)
+        if self.policy == "mcts":
+            if self.mcts is None:
+                # TODO: get rid of magic numbers
+                self.mcts = MCTS(random_seed=self.random_seed)
+            return self.mcts.get_action(
+                team=team,
+                data=data,
+                teams=teams,
+                policies=policies,
+                current_round=current_round,
+            )
 
     def update_learned_policy(self, draft_results: dict) -> None:
         if self.offline_policy is None:
@@ -49,7 +71,7 @@ class Policy:
 
         return self._random_action(team)
 
-    def _epsilon_learned_policy_action(self, team: Team, current_round: int):
+    def _epsilon_offline_policy_action(self, team: Team, current_round: int):
         if random.random() > self.epsilon:
             return self._offline_policy_action(team, current_round)
 

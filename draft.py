@@ -1,4 +1,5 @@
 import random
+from typing import Optional
 
 from data import Data
 from draft_policy import Policy
@@ -6,8 +7,15 @@ from team import Team
 
 
 class Draft:
-    def __init__(self, needed_pos_and_counts: dict, policies: list):
-        teams = [Team(needed_pos_and_counts) for _ in range(len(policies))]
+    def __init__(
+            self,
+            needed_pos_and_counts: dict,
+            policies: list[Policy],
+            teams: Optional[list[Team]] = None,
+    ):
+        assert teams is not None or policies is not None
+        if teams is None:
+            teams = [Team(needed_pos_and_counts) for _ in range(len(policies))]
         self.teams = teams
         self.policies = policies
         self.team_count = len(policies)
@@ -24,10 +32,13 @@ class Draft:
         while self.current_pick <= self.rounds * self.team_count:
             current_team = self.current_team_selecting
             position_to_draft = self.policies[self.current_team_index].get_action(
-                current_team,
-                self.current_round,
-                data
-            )
+                team=current_team,
+                current_round=self.current_round,
+                data=data,
+                policies=self.policies,
+                teams=self.teams,
+            )  # TODO: turn this into a dataclass
+            assert position_to_draft is not None
             score = data.get_and_remove_score(position_to_draft)
             self._next_team_selection(position_to_draft, score)
 
