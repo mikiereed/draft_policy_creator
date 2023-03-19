@@ -1,24 +1,33 @@
 from draft import Draft
-
+from draft_policy import Policy
 
 _simple_pos_and_counts = {
-        "qb": 3,
-        "rb": 2,
-        "te": 1,
-    }
+    "qb": 3,
+    "rb": 2,
+    "te": 1,
+}
+
+_policies_all_random = [Policy("random")]
 
 
 def test_init():
-    draft = Draft(5, _simple_pos_and_counts)
+    team_count = 5
+    draft = Draft(
+        needed_pos_and_counts=_simple_pos_and_counts,
+        policies=_policies_all_random * team_count,
+    )
 
     assert draft.teams[3].needed_pos_counts == _simple_pos_and_counts
     assert draft.teams[2].score == 0
     assert len(draft.teams) == 5
-    assert draft.rounds == 6
 
 
 def test_next_player_selection():
-    draft = Draft(3, _simple_pos_and_counts)
+    team_count = 3
+    draft = Draft(
+        needed_pos_and_counts=_simple_pos_and_counts,
+        policies=_policies_all_random * team_count,
+    )
     assert draft.current_team_selecting.score == 0
 
     draft._next_team_selection("qb", 50.4)

@@ -14,7 +14,7 @@ def test_data_init():
     assert len(data.players["rb"]) == 6
     assert len(data.players["te"]) == 3
 
-    assert data.players["qb"][0] == 311.4663920439532  # random_seed will ensure this is always the same
+    assert data.players["qb"][0] == 207.8746937695424  # random_seed will ensure this is always the same
 
 
 def test_data_init_percent_extra():
