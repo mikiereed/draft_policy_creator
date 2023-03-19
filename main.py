@@ -5,7 +5,6 @@ import random
 from data import Data
 from draft import Draft
 from draft_policy import Policy
-from mcts import MCTS
 
 
 def print_policies(policies: list[Policy], pos_counts: dict) -> None:
@@ -13,10 +12,11 @@ def print_policies(policies: list[Policy], pos_counts: dict) -> None:
         print(f"{idx}: {policies[idx].get_offline_policy(pos_counts)}")
 
 
-def simulate_n_drafts(policies: list[Policy], pos_counts: dict, data: Data, n: int, update_offline: bool = False):
+def simulate_n_drafts(policies: list[Policy], pos_counts: dict, data: Data, n: int, update_offline: bool = False,
+                      verbose: bool = False):
     wins_by_index = [0] * team_count
     for sim_number in range(n):
-        draft = Draft(pos_counts, policies)
+        draft = Draft(needed_pos_and_counts=pos_counts, policies=policies)
         _data = copy.deepcopy(data)
         draft.simulate(_data)
         results = draft.results()
@@ -25,95 +25,94 @@ def simulate_n_drafts(policies: list[Policy], pos_counts: dict, data: Data, n: i
                 policies[i].update_learned_policy(results[i])
         for best in results:
             wins_by_index[best] += 1
+            if verbose:
+                print(f"{best}", end=", ")
             break
 
-        # if sim_number % (n * 0.5) == 0:
-        #     print(f"simulation {sim_number}")
-            # print_policies(policies, pos_counts)
-            # print("----------------------------------------------")
-
-    # print_policies(policies, pos_counts)
-    # print()
+    if verbose:
+        print()
 
     return wins_by_index
 
 
-def offline_policy_testing(n_draft_data: int, pos_counts: dict, team_count: int, random_seed_start: int = None) -> list:
+def policy_testing(
+        policy_to_test: str,
+        opponent_policies: str,
+        n_draft_data: int,
+        simulations_per_data: int,
+        pos_counts: dict,
+        team_count: int,
+        random_seed_start: int = None,
+) -> list:
     random_seed = random_seed_start if random_seed_start is not None else random.randint(1, 1_000_000)
+    update_offline = False
+    if policy_to_test == "offline" or opponent_policies == "offline":
+        update_offline = True
 
-    policy_improvement_average = [0] * team_count
+    policy_statistics = [{"baseline_wins": 0, "policy_wins": 0} for _ in range(team_count)]
     for i in range(n_draft_data):
         print(f"data set {i} ===================================================================")
         data = Data(team_count, pos_counts, percent_extra=0, random_seed=random_seed)
 
-        # test random policies only
-        policies = [Policy(policy="random", random_seed=random_seed) for _ in range(team_count)]
-        random_wins_count = simulate_n_drafts(policies=policies, pos_counts=pos_counts, data=data, n=10_000,
-                                              update_offline=True)
-        print({i: random_wins_count[i] for i in range(len(random_wins_count))})
+        # test opponent policies only for baseline
+        policies = [Policy(policy=opponent_policies, random_seed=random_seed) for _ in range(team_count)]
+        baseline_wins_count = simulate_n_drafts(policies=policies,
+                                                pos_counts=pos_counts,
+                                                data=data,
+                                                n=simulations_per_data,
+                                                update_offline=update_offline,
+                                                )
+        print({j: baseline_wins_count[j] for j in range(len(baseline_wins_count))})
+        for j in range(team_count):
+            policy_statistics[j]["baseline_wins"] += baseline_wins_count[j]
 
-        # test offline policy
+        # train offline if testing offline
+        if update_offline:
+            simulate_n_drafts(policies=policies,
+                              pos_counts=pos_counts,
+                              data=data,
+                              n=10_000,
+                              update_offline=update_offline,
+                              )
+
+        # test policy
         for j in range(len(policies)):
+            print(f"{policy_to_test} for {j}")
             _policies = copy.deepcopy(policies)
-            _policies[j].policy = "offline"
-            policy_wins_count = simulate_n_drafts(policies=_policies, pos_counts=pos_counts, data=data, n=10_000)
-            print(f"offline for {j}")
-            print(f"{j}: {policies[j].get_offline_policy(pos_counts)}")
-            random_policy_wins = random_wins_count[j]
-            offline_policy_wins = policy_wins_count[j]
-            print(f"random wins: {random_policy_wins} / offline policy wins: {offline_policy_wins}")
-            policy_improvement = int(((offline_policy_wins - random_policy_wins) / random_policy_wins) * 100)
-            policy_improvement_average[j] += (1 / (i + 1)) * (policy_improvement - policy_improvement_average[j])
+            _policies[j].policy = policy_to_test
+            verbose = False
+            if policy_to_test == "mcts":
+                verbose = True
+            policy_wins_count = simulate_n_drafts(policies=_policies,
+                                                  pos_counts=pos_counts,
+                                                  data=data,
+                                                  n=simulations_per_data,
+                                                  verbose=verbose
+                                                  )
+            # if policy_to_test == "offline":
+            #     print(f"{j}: {policies[j].get_offline_policy(pos_counts)}")
+            random_policy_wins = baseline_wins_count[j]
+            policy_wins = policy_wins_count[j]
+            policy_statistics[j]["policy_wins"] += policy_wins
+            print(f"random wins: {random_policy_wins} / {policy_to_test} policy wins: {policy_wins}")
+            if random_policy_wins:
+                policy_improvement = int(((policy_wins - random_policy_wins) / random_policy_wins) * 100)
+            else:
+                policy_improvement = math.inf
             print(f"policy improvement: {policy_improvement}%")
             print("-----------------------------------------------------")
 
         random_seed += 1
 
-    return policy_improvement_average
+    for j in range(team_count):
+        if policy_statistics[j]["baseline_wins"] != 0:  # divide by zero error
+            policy_statistics[j]["policy_improvement"] = int(((policy_statistics[j]["policy_wins"] -
+                                                               policy_statistics[j]["baseline_wins"]) /
+                                                              policy_statistics[j]["baseline_wins"]) * 100)
+        else:
+            policy_statistics[j]["policy_improvement"] = math.inf
 
-
-def offline_epsilon_policy_testing(n_draft_data: int, pos_counts: dict, team_count: int, random_seed_start: int = None) -> list:
-    random_seed = random_seed_start if random_seed_start is not None else random.randint(1, 1_000_000)
-
-    policy_improvement_average = [0] * team_count
-    for i in range(n_draft_data):
-        print(f"data set {i} ===================================================================")
-        data = Data(team_count, pos_counts, percent_extra=0, random_seed=random_seed)
-
-        # test random policies only
-        policies = [Policy(policy="random", random_seed=random_seed) for _ in range(team_count)]
-        random_wins_count = simulate_n_drafts(policies=policies, pos_counts=pos_counts, data=data, n=10_000,
-                                              update_offline=False)
-        print(f"random win counts ===========================")
-        print({i: random_wins_count[i] for i in range(len(random_wins_count))})
-
-        # train offline vs each other
-        policies = [Policy(policy="epsilon_offline", random_seed=random_seed) for _ in range(team_count)]
-        offline_training_wins_count = simulate_n_drafts(policies=policies, pos_counts=pos_counts, data=data, n=10_000,
-                                              update_offline=True)
-        print(f"offline win counts ===========================")
-        print({i: offline_training_wins_count[i] for i in range(len(offline_training_wins_count))})
-
-        # test offline policy
-        for policy in policies:
-            policy.policy = "random"
-        for j in range(len(policies)):
-            _policies = copy.deepcopy(policies)
-            _policies[j].policy = "offline"
-            policy_wins_count = simulate_n_drafts(policies=_policies, pos_counts=pos_counts, data=data, n=10_000)
-            print(f"offline for {j}")
-            print(f"{j}: {policies[j].get_offline_policy(pos_counts)}")
-            random_policy_wins = random_wins_count[j]
-            offline_policy_wins = policy_wins_count[j]
-            print(f"random wins: {random_policy_wins} / offline policy wins: {offline_policy_wins}")
-            policy_improvement = int(((offline_policy_wins - random_policy_wins) / random_policy_wins) * 100)
-            policy_improvement_average[j] += (1 / (i + 1)) * (policy_improvement - policy_improvement_average[j])
-            print(f"policy improvement: {policy_improvement}%")
-            print("-----------------------------------------------------")
-
-        random_seed += 1
-
-    return policy_improvement_average
+    return policy_statistics
 
 
 if __name__ == "__main__":
@@ -126,19 +125,47 @@ if __name__ == "__main__":
         "k": 1,
         "dst": 1,
     }
-    #
-    # policy_improvement_average = offline_policy_testing(n_draft_data=100, pos_counts=pos_counts, team_count=team_count, random_seed_start=88)
-    # print({i: f'{int(policy_improvement_average[i])}%' for i in range(len(policy_improvement_average))})
+    random_seed_start = 88
+    n_draft_data = 40
+    n_drafts = 25
 
-    # policy_improvement_average = offline_epsilon_policy_testing(n_draft_data=100, pos_counts=pos_counts, team_count=team_count, random_seed_start=None)
-    # print({i: f'{int(policy_improvement_average[i])}%' for i in range(len(policy_improvement_average))})
+    # offline policy testing
+    print(f"offline ============================================================")
+    offline_policy_improvement_average = policy_testing(policy_to_test="offline",
+                                                        opponent_policies="random",
+                                                        n_draft_data=n_draft_data,
+                                                        simulations_per_data=n_drafts,
+                                                        pos_counts=pos_counts,
+                                                        team_count=team_count,
+                                                        random_seed_start=random_seed_start,
+                                                        )
+    print("============================================================")
+    print("RESULTS FOR OFFLINE============================================================")
+    for i in range(team_count):
+        print(f'{i}: {offline_policy_improvement_average[i]["policy_improvement"]}%')
+        print(f'random: {offline_policy_improvement_average[i]["baseline_wins"]} | offline: {offline_policy_improvement_average[i]["policy_wins"]}')
+        print("============================================================")
 
-    monte_carlo_tree_search = MCTS(c=math.sqrt(2))
-    random_seed = 1
-    # make function to run this n times
-
-    policies = [Policy(policy="mcts", random_seed=random_seed) for _ in range(team_count)]
-    draft = Draft(needed_pos_and_counts=pos_counts, policies=policies)
-    data = Data(team_count=team_count, pos_counts=pos_counts)
-    # policy_improvement_average = monte_carlo_tree_search.get_action(draft.current_team_index, data=data, teams=draft.teams)
-    draft.simulate(data)
+    # mcts policy testing
+    print(f"mcts ============================================================")
+    mcts_policy_improvement_average = policy_testing(policy_to_test="mcts",
+                                                     opponent_policies="random",
+                                                     n_draft_data=n_draft_data,
+                                                     simulations_per_data=n_drafts,
+                                                     pos_counts=pos_counts,
+                                                     team_count=team_count,
+                                                     random_seed_start=random_seed_start,
+                                                     )
+    print("============================================================")
+    print("RESULTS FOR MCTS============================================================")
+    for i in range(team_count):
+        print(f'{i}: {mcts_policy_improvement_average[i]["policy_improvement"]}%')
+        print(
+            f'random: {mcts_policy_improvement_average[i]["baseline_wins"]} | mcts: {mcts_policy_improvement_average[i]["policy_wins"]}')
+        print("============================================================")
+    print("RESULTS FOR ALL============================================================")
+    for i in range(team_count):
+        print(f'{i}= offline: {offline_policy_improvement_average[i]["policy_improvement"]}% | mcts: {mcts_policy_improvement_average[i]["policy_improvement"]}%')
+        print(
+            f'random: {offline_policy_improvement_average[i]["baseline_wins"]} | offline: {offline_policy_improvement_average[i]["policy_wins"]} | mcts: {mcts_policy_improvement_average[i]["policy_wins"]}')
+        print("============================================================")

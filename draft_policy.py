@@ -47,7 +47,6 @@ class Policy:
             return self._epsilon_offline_policy_action(team, current_round)
         if self.policy == "mcts":
             if self.mcts is None:
-                # TODO: get rid of magic numbers
                 self.mcts = MCTS(random_seed=self.random_seed)
             return self.mcts.get_action(
                 team=team,
@@ -95,7 +94,7 @@ class Policy:
         positions_left = list(team.needed_pos_counts.keys())
         best_option = None
         best_option_value = -math.inf
-        _offline_policy = self.offline_policy[current_round]
+        _offline_policy = self.offline_policy.get(current_round, {})
         for position in _offline_policy:
             if _offline_policy[position] > best_option_value and position in positions_left:
                 best_option = position

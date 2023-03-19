@@ -11,6 +11,13 @@ class Team:
         self.pos_draft_order.append(f"{pos}")
         self.current_pos_counts[pos] += 1
         self.needed_pos_counts[pos] -= 1
-        self.current_roster_size += 1
         if self.needed_pos_counts[pos] == 0:
             del self.needed_pos_counts[pos]
+        self.current_roster_size += 1
+
+    def remaining_picks_count(self) -> int:
+        remaining_picks = 0
+        for pos in self.needed_pos_counts:
+            remaining_picks += self.needed_pos_counts[pos]
+
+        return remaining_picks

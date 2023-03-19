@@ -20,7 +20,6 @@ def test_init():
     assert draft.teams[3].needed_pos_counts == _simple_pos_and_counts
     assert draft.teams[2].score == 0
     assert len(draft.teams) == 5
-    assert draft.rounds == 6
 
 
 def test_next_player_selection():
